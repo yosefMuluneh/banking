@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import HeaderBox from '@/components/HeaderBox'
 import RightSidebar from '@/components/RightSidebar'
 import TotalBalanceBox from '@/components/TotalBalanceBox'
@@ -32,14 +31,8 @@ const Home = () => {
         ]}
       />
     </section>
-=======
-import React from 'react'
-
-const Home = () => {
-  return (
-    <div>Home</div>
->>>>>>> ba0cf813dc175264363d4b98d73ce535121ef78f
   )
+
 }
 
 export default Home
