@@ -9,27 +9,21 @@
     "lint": "next lint"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@radix-ui/react-dialog": "^1.1.1",
     "chart.js": "^4.4.3",
-=======
->>>>>>> ba0cf813dc175264363d4b98d73ce535121ef78f
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.424.0",
     "next": "14.2.5",
-<<<<<<< HEAD
     "query-string": "^9.1.0",
     "react": "^18",
     "react-chartjs-2": "^5.2.0",
     "react-countup": "^6.5.3",
-=======
-    "react": "^18",
->>>>>>> ba0cf813dc175264363d4b98d73ce535121ef78f
     "react-dom": "^18",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7"
-  },
+  }
+,
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
