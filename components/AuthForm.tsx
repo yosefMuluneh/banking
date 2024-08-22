@@ -13,6 +13,7 @@ import { authFormSchema } from '@/lib/utils'
 import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { signUp, signIn } from '@/lib/actions/user.actions'
+import PlaidLink from './PlaidLink'
 
 const AuthForm = ({ type } : { type : string }) => {
     const router = useRouter()
@@ -37,8 +38,20 @@ const AuthForm = ({ type } : { type : string }) => {
         setLoading(true)
         try {
             if (type === 'sign-up') {
+                const userData = {
+                    firstName: data.firstname!,
+                    lastName: data.lastname!,
+                    address1: data.address1!,
+                    city: data.city!,
+                    state: data.state!,
+                    postalCode: data.postalcode!,
+                    dateOfBirth: data.dateOfBirth!,
+                    ssn: data.ssn!,
+                    email: data.email,
+                    password: data.password
+                }
                 console.log('data', data)
-                const newUser = await signUp(data)
+                const newUser = await signUp(userData)
                 setUser(newUser)
             } else if (type === 'sign-in') {
                 const loggedIn = await signIn({
@@ -74,12 +87,15 @@ const AuthForm = ({ type } : { type : string }) => {
                         </p>
                     </div>
                 </header>
-                {user ? (
-                    <div className='flex flex-col gap-4'>
-                        {/* PlaidLink */}
-                        <Button className='form-btn'>Link Account</Button>
-                    </div>
-                ) : (
+                {
+                    user ? (
+                        <div className='flex flex-col gap-4'>
+                            <PlaidLink 
+                            user={user}
+                            variant='primary' />
+                        
+                        </div>
+                    ) : ( 
                     <>
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
