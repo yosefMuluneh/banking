@@ -63,6 +63,7 @@ export const getAccounts = async ({ userId
     return parseStringify({ data: accounts, totalBanks, totalCurrentBalance });
   } catch (error) {
     console.error("An error occurred while getting the accounts:", error);
+    return parseStringify({ data: [], totalBanks: 0, totalCurrentBalance: 0 });
   }
 };
 
@@ -133,6 +134,22 @@ export const getAccount = async ({ appwriteItemId }: getAccountProps) => {
     });
   } catch (error) {
     console.error("An error occurred while getting the account:", error);
+    // Return account with empty transactions instead of undefined
+    return parseStringify({
+      data: {
+        id: "",
+        availableBalance: 0,
+        currentBalance: 0,
+        institutionId: "",
+        name: "",
+        officialName: "",
+        mask: "",
+        type: "",
+        subtype: "",
+        appwriteItemId: appwriteItemId,
+      },
+      transactions: [],
+    });
   }
 };
 
@@ -188,7 +205,8 @@ export const getTransactions = async ({
 
     return parseStringify(transactions);
   } catch (error) {
-    console.error("An error occurred while getting the accounts:", error);
+    console.error("An error occurred while getting transactions:", error);
+    return parseStringify([]); // Return empty array instead of undefined
   }
 };
 

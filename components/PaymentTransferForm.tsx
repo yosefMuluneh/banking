@@ -11,6 +11,7 @@ import { createTransfer } from "@/lib/actions/dwolla.action";
 import { createTransaction } from "@/lib/actions/transaction.action";
 import { getBank, getBankByAccountId } from "@/lib/actions/user.actions";
 import { decryptId, transferFormSchema } from "@/lib/utils";
+import { useToast } from "@/components/ui/toast";
 
 import { BankDropdown } from "./BankDropdown";
 import { Button } from "./ui/button";
@@ -31,6 +32,7 @@ const formSchema = transferFormSchema()
 
 const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
   const router = useRouter();
+  const { showToast, dismissAllOfType } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -46,6 +48,7 @@ const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
 
   const submit = async (data: z.infer<typeof formSchema>) => {
     setIsLoading(true);
+    showToast('Processing your transfer...', 'loading');
 
     try {
       const receiverAccountId = decryptId(data.sharableId);
@@ -78,14 +81,24 @@ const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
 
         if (newTransaction) {
           form.reset();
+          dismissAllOfType('loading');
+          showToast('Transaction is being processed. Funds will arrive within 1-3 business days.', 'success');
           router.push("/");
+        } else {
+          dismissAllOfType('loading');
+          showToast('Transfer created but transaction recording failed.', 'error');
         }
+      } else {
+        dismissAllOfType('loading');
+        showToast('Failed to process transfer. Please try again.', 'error');
       }
     } catch (error) {
       console.error("Submitting create transfer request failed: ", error);
+      dismissAllOfType('loading');
+      showToast('Something went wrong. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -124,7 +137,7 @@ const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
         <PaymentInputForm 
             control={form.control}
             name='email'
-            label="Recipient&apos;s Email Address"
+            label="Recipient's Email Address"
             otherStyles="py-5"
             placeholder="ex: johndoe@gmail.com"
          />
@@ -132,7 +145,7 @@ const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
         <PaymentInputForm 
             control={form.control}
             name='sharableId'
-            label="Receiver&apos;s Plaid Sharable Id"
+            label="Receiver's Plaid Sharable Id"
             otherStyles="pb-5 pt-6"
             placeholder="Enter the public account number"
          />

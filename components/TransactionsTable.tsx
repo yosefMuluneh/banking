@@ -42,7 +42,7 @@ const TransactionsTable = ({transactions}:TransactionTableProps) => {
         </TableHeader>
         <TableBody>
             {
-                transactions.map((tra: Transaction)=>{
+               transactions.length > 0 ? transactions.map((tra: Transaction)=>{
                     const status = getTransactionStatus(new Date(tra.date))
                     const amount = formatAmount(tra.amount)
                     const isDebit = tra.type === 'debit'
@@ -75,6 +75,9 @@ const TransactionsTable = ({transactions}:TransactionTableProps) => {
                         </TableRow>
                     )
                 })
+                : <div className='flex h-[200px] w-full items-center justify-center'>
+                    <p>No transactions found</p>
+                    </div>
             }
         </TableBody>
     </Table>

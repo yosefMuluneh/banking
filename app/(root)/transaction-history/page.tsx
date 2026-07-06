@@ -26,10 +26,10 @@ const TransactionHistory = async ({ searchParams :{id, page}}:SearchParamProps) 
 
   const indexOfLastTransaction = currentPage * rowsPerPage;
   const indexOfFirstTransaction = indexOfLastTransaction - rowsPerPage;
-  const currentTransactions = account?.transactions.slice(
+  const currentTransactions = account ? account?.transactions.slice(
       indexOfFirstTransaction,
       indexOfLastTransaction
-  );
+  ) : [];
   return (
     <div className='transactions'>
       <div className='transactions-header'>
