@@ -148,7 +148,7 @@ export const createLinkToken = async (user: User) => {
     const toenParams = {
       user:{ client_user_id: user.$id },
       client_name: `${user.firstName} ${user.lastName}`,
-      products: ['auth'] as Products[],
+      products: ['auth', 'transactions'] as Products[],
       language: 'en',
       country_codes: ['US'] as CountryCode[],
     }
@@ -184,24 +184,30 @@ export const exchangePublicToken = async ({user, publicToken}:exchangePublicToke
     const accountsResponse = await plaidClient.accountsGet({ access_token });
     const accountData = accountsResponse.data.accounts[0];
 
-    const request : ProcessorTokenCreateRequest = {
-      account_id: accountData.account_id,
-      processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
-      access_token
-    };
-    const processorTokenResponse = await plaidClient.processorTokenCreate(request);
-    const processorToken = processorTokenResponse.data.processor_token;
+    // Plaid bank linking is independent of Dwolla onboarding. If the user
+    // already has a Dwolla customer, also create the Dwolla funding source;
+    // otherwise save the Plaid connection and allow Dwolla setup later.
+    let fundingSourceurl = "";
 
-    if (!user.dwollaCustomerId) {
-      throw new Error("This bank-linking integration is not enabled for your account's country.");
+    if (user.dwollaCustomerId) {
+      const request: ProcessorTokenCreateRequest = {
+        account_id: accountData.account_id,
+        processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
+        access_token
+      };
+      const processorTokenResponse = await plaidClient.processorTokenCreate(request);
+      const processorToken = processorTokenResponse.data.processor_token;
+
+      fundingSourceurl = await addFundingSource({
+        dwollaCustomerId: user.dwollaCustomerId,
+        processorToken,
+        bankName: accountData.name
+      }) || "";
+
+      if (!fundingSourceurl) {
+        throw new Error("The bank was linked, but its Dwolla funding source could not be created.");
+      }
     }
-
-    const fundingSourceurl = await addFundingSource({
-      dwollaCustomerId: user.dwollaCustomerId,
-      processorToken,
-      bankName: accountData.name
-    });
-    if(!fundingSourceurl) throw new Error("Unable to create a bank funding source.");
 
     const bankAccount = await createBankAccount({
       userId: user.$id,
