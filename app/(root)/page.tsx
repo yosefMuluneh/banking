@@ -27,6 +27,11 @@ const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
   return (
     <section className='home'>
       <div className='home-content'>
+        {accountsData.length === 0 && (
+          <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900'>
+            Your Horizon account is ready. Bank connections and transfers will be enabled when a banking provider is available for your country.
+          </div>
+        )}
         <header className='home-header'>
           <HeaderBox 
             type="greeting"
