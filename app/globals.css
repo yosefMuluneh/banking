@@ -383,3 +383,56 @@
 }
 
 
+
+
+/* Dashboard layout containment: keep the fixed sidebars outside the
+   transaction table's horizontal scrolling area. */
+.home {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.home-content {
+  min-width: 0;
+  min-height: 0;
+  width: auto;
+  flex: 1 1 0%;
+  overflow-x: hidden;
+}
+
+.recent-transactions,
+.recent-transactions > *,
+.recent-transactions [role="tabpanel"] {
+  min-width: 0;
+}
+
+.recent-transactions-tablist {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.right-sidebar {
+  width: 355px !important;
+  min-width: 355px;
+  max-width: 355px;
+  flex: 0 0 355px;
+  min-height: 0;
+}
+
+.right-sidebar .profile-email {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1279px) {
+  .home {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .home-content {
+    overflow-y: visible;
+  }
+}

@@ -7,13 +7,41 @@ import { encryptId, parseStringify } from "../utils";
 import { CountryCode, ProcessorTokenCreateRequestProcessorEnum, Products, ProcessorTokenCreateRequest } from "plaid";
 import { plaidClient } from "../plaid";
 import { revalidatePath } from "next/cache";
-import { addFundingSource } from "./dwolla.action";
+import { addFundingSource, createDwollaCustomer } from "./dwolla.action";
 
 const {
   APPWRITE_DATABASE_ID: DATABASE_ID,
   APPWRITE_USER_COLLECTION_ID: USER_COLLECTION_ID,
   APPWRITE_BANK_COLLECTION_ID: BANK_COLLECTION_ID,
 } = process.env;
+
+const getPlaidErrorDetails = (error: unknown) => {
+  const plaidError = error as {
+    message?: string;
+    error_code?: string;
+    error_message?: string;
+    display_message?: string | null;
+    response?: {
+      data?: {
+        error_code?: string;
+        error_message?: string;
+        display_message?: string | null;
+      };
+    };
+  };
+  const details = plaidError.response?.data ?? plaidError;
+  const code = details.error_code;
+  const message =
+    details.display_message ||
+    details.error_message ||
+    plaidError.message ||
+    "Plaid could not complete the bank-account request.";
+
+  return {
+    code,
+    message: code ? `Plaid ${code}: ${message}` : message,
+  };
+};
 
 export const signUp = async ({password,...userData} : SignUpParams) => {
   let admin: Awaited<ReturnType<typeof createAdminClient>> | undefined;
@@ -148,9 +176,10 @@ export const createLinkToken = async (user: User) => {
     const toenParams = {
       user:{ client_user_id: user.$id },
       client_name: `${user.firstName} ${user.lastName}`,
-      products: ['auth'] as Products[],
+      products: ['auth', 'transactions'] as Products[],
       language: 'en',
       country_codes: ['US'] as CountryCode[],
+      account_selection: 'single',
     }
     const response = await plaidClient.linkTokenCreate(toenParams);
     return parseStringify({linkToken : response.data.link_token});
@@ -176,32 +205,61 @@ export const createBankAccount = async ({
   }
 }
 
-export const exchangePublicToken = async ({user, publicToken}:exchangePublicTokenProps) => {
+export const exchangePublicToken = async ({
+  user,
+  publicToken,
+  selectedAccountId,
+}: exchangePublicTokenProps) => {
   try {
     const response = await plaidClient.itemPublicTokenExchange({ public_token: publicToken });
     const {access_token, item_id} = response.data;
 
     const accountsResponse = await plaidClient.accountsGet({ access_token });
-    const accountData = accountsResponse.data.accounts[0];
+    const accounts = accountsResponse.data.accounts;
+    const accountData = selectedAccountId
+      ? accounts.find((account) => account.account_id === selectedAccountId)
+      : accounts[0];
 
-    const request : ProcessorTokenCreateRequest = {
-      account_id: accountData.account_id,
-      processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
-      access_token
-    };
-    const processorTokenResponse = await plaidClient.processorTokenCreate(request);
-    const processorToken = processorTokenResponse.data.processor_token;
-
-    if (!user.dwollaCustomerId) {
-      throw new Error("This bank-linking integration is not enabled for your account's country.");
+    if (!accountData) {
+      throw new Error(
+        selectedAccountId
+          ? "The account selected in Plaid Link could not be retrieved. Please reconnect the bank and select an account."
+          : "Plaid did not return an account for this bank connection."
+      );
     }
 
-    const fundingSourceurl = await addFundingSource({
-      dwollaCustomerId: user.dwollaCustomerId,
-      processorToken,
-      bankName: accountData.name
-    });
-    if(!fundingSourceurl) throw new Error("Unable to create a bank funding source.");
+    // Plaid bank linking remains independent of Dwolla. If a Dwolla
+    // funding source cannot be created, still persist the Plaid connection
+    // and report the transfer setup issue separately to the UI.
+    let fundingSourceurl = "";
+    let fundingSourceError: string | undefined;
+
+    if (user.dwollaCustomerId) {
+      try {
+        const request: ProcessorTokenCreateRequest = {
+          account_id: accountData.account_id,
+          processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
+          access_token
+        };
+        const processorTokenResponse = await plaidClient.processorTokenCreate(request);
+        const processorToken = processorTokenResponse.data.processor_token;
+
+        fundingSourceurl = await addFundingSource({
+          dwollaCustomerId: user.dwollaCustomerId,
+          processorToken,
+          bankName: accountData.name
+        }) || "";
+      } catch (error) {
+        const details = getPlaidErrorDetails(error);
+        // Provider errors may contain request configuration with access tokens.
+        // Log only the sanitized provider code/message.
+        console.error(
+          "Plaid bank connected, but Dwolla funding source creation failed:",
+          details.message
+        );
+        fundingSourceError = details.message;
+      }
+    }
 
     const bankAccount = await createBankAccount({
       userId: user.$id,
@@ -214,7 +272,11 @@ export const exchangePublicToken = async ({user, publicToken}:exchangePublicToke
 
     if(!bankAccount) throw new Error('Error creating bank account');
     revalidatePath('/');
-    return parseStringify({ publicTokenExchange: 'Bank account added successfully' });
+    return parseStringify({
+      publicTokenExchange: 'Bank account added successfully',
+      fundingSourceLinked: Boolean(fundingSourceurl),
+      fundingSourceError,
+    });
   } catch (error) {
     console.error('Error', error);
     throw error instanceof Error ? error : new Error("Unable to connect this bank account.");
@@ -233,6 +295,154 @@ export const getBanks = async ({userId}:getBanksProps) => {
     return [];
   }
 }
+
+// Create a synthetic Dwolla personal customer in Sandbox and attach
+// any existing Plaid-linked checking/savings accounts as funding sources.
+// No real identity data is collected or persisted by this portfolio flow.
+export const completeDwollaSandboxOnboarding = async () => {
+  const user = await getLoggedInUser();
+
+  if (!user) {
+    throw new Error("Your session has expired. Please sign in again.");
+  }
+
+  if (process.env.DWOLLA_ENV !== "sandbox") {
+    throw new Error("Dwolla sandbox onboarding is available only when DWOLLA_ENV=sandbox.");
+  }
+
+  const { database } = await createAdminClient();
+  let customerId = user.dwollaCustomerId;
+  let customerUrl = user.dwollaCustomerUrl;
+
+  if (!customerId) {
+    const sandboxCustomer: NewDwollaCustomerParams = {
+      firstName: "verified",
+      lastName: "Customer",
+      email: `sandbox-${user.$id}@example.com`,
+      type: "personal",
+      address1: "9876 Million Dollar St",
+      city: "Des Moines",
+      state: "IA",
+      postalCode: "50265",
+      dateOfBirth: "1980-01-01",
+      ssn: "1234",
+      ipAddress: "143.156.7.8",
+    };
+
+    customerUrl = await createDwollaCustomer(sandboxCustomer);
+    const customerIdFromUrl = customerUrl.match(/\/customers\/([^/?#]+)/)?.[1];
+
+    if (!customerIdFromUrl) {
+      throw new Error("Dwolla created a customer but returned an invalid customer URL.");
+    }
+
+    customerId = customerIdFromUrl;
+
+    await database.updateDocument(
+      DATABASE_ID!,
+      USER_COLLECTION_ID!,
+      user.$id,
+      {
+        dwollaCustomerId: customerId,
+        dwollaCustomerUrl: customerUrl,
+      }
+    );
+  }
+
+  if (!customerId) {
+    throw new Error("Dwolla customer setup did not return a customer ID.");
+  }
+
+  const banks = await getBanks({ userId: user.$id });
+  const linkedBanks: string[] = [];
+  const skippedBanks: string[] = [];
+  const unsupportedBanks: Array<{ bankName: string; reason: string }> = [];
+  const failedBanks: Array<{ bankName: string; reason: string }> = [];
+
+  for (const bank of banks as Bank[]) {
+    let bankName = bank.$id;
+
+    if (bank.fundingSourceUrl) {
+      skippedBanks.push(bank.$id);
+      continue;
+    }
+
+    try {
+      const accountsResponse = await plaidClient.accountsGet({
+        access_token: bank.accessToken,
+      });
+      const account = accountsResponse.data.accounts.find(
+        (item) => item.account_id === bank.accountId
+      );
+
+      if (!account) {
+        throw new Error("The linked Plaid account could not be found.");
+      }
+      bankName = account.name;
+
+      if (
+        account.type !== "depository" ||
+        !["checking", "savings"].includes(account.subtype ?? "")
+      ) {
+        throw new Error("Dwolla funding sources require a checking or savings account.");
+      }
+
+      const processorTokenResponse = await plaidClient.processorTokenCreate({
+        access_token: bank.accessToken,
+        account_id: bank.accountId,
+        processor: "dwolla" as ProcessorTokenCreateRequestProcessorEnum,
+      });
+
+      const fundingSourceUrl = await addFundingSource({
+        dwollaCustomerId: customerId,
+        processorToken: processorTokenResponse.data.processor_token,
+        bankName: account.name,
+      });
+
+      await database.updateDocument(
+        DATABASE_ID!,
+        BANK_COLLECTION_ID!,
+        bank.$id,
+        { fundingSourceUrl }
+      );
+
+      linkedBanks.push(bank.$id);
+    } catch (error) {
+      const details = getPlaidErrorDetails(error);
+      // INVALID_ACCOUNT_ID means Plaid does not permit this account to be used
+      // for money movement. The Plaid connection itself remains valid.
+      if (details.code === "INVALID_ACCOUNT_ID") {
+        unsupportedBanks.push({
+          bankName,
+          reason: details.message,
+        });
+        continue;
+      }
+
+      // Do not log the full SDK error object: request configuration can contain
+      // sensitive access tokens. Keep diagnostics limited to provider messages.
+      console.error(`Could not attach bank "${bankName}" to Dwolla:`, details.message);
+      failedBanks.push({
+        bankName,
+        reason: details.message,
+      });
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/my-banks");
+  revalidatePath("/payment-transfer");
+
+  return parseStringify({
+    customerId,
+    customerCreated: !user.dwollaCustomerId,
+    linkedCount: linkedBanks.length,
+    alreadyLinkedCount: skippedBanks.length,
+    unsupportedBanks,
+    failedBanks,
+    hasBanks: banks.length > 0,
+  });
+};
 
 export const getBank = async ({documentId}:getBankProps) => {
   try {

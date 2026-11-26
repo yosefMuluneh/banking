@@ -68,7 +68,8 @@ declare type Transaction = {
   type: string;
   accountId: string;
   amount: number;
-  pending: boolean;
+  pending?: boolean;
+  status?: string;
   category: string;
   date: string;
   image: string;
@@ -132,6 +133,7 @@ declare type NewDwollaCustomerParams = {
   postalCode: string;
   dateOfBirth: string;
   ssn: string;
+  ipAddress: string;
 };
 
 declare interface CreditCardProps {
@@ -168,6 +170,8 @@ declare interface PageHeaderProps {
 declare interface PaginationProps {
   page: number;
   totalPages: number;
+  onPageChange?: (page: number) => void;
+  isLoading?: boolean;
 }
 
 declare interface PlaidLinkProps {
@@ -191,7 +195,8 @@ declare interface AuthFormProps {
 
 declare interface BankDropdownProps {
   accounts: Account[];
-  setValue?: UseFormSetValue<any>;
+  value?: string;
+  onChange?: (value: string) => void;
   otherStyles?: string;
 }
 
@@ -213,7 +218,7 @@ declare interface FooterProps {
 
 declare interface RightSidebarProps {
   user: User;
-  transactions: Transaction[];
+  transactions?: Transaction[];
   banks: Bank[] & Account[];
 }
 
@@ -239,6 +244,7 @@ declare interface CategoryBadgeProps {
 
 declare interface TransactionTableProps {
   transactions: Transaction[];
+  isLoading?: boolean;
 }
 
 declare interface CategoryProps {
@@ -274,7 +280,7 @@ declare interface CreateFundingSourceOptions {
   customerId: string; // Dwolla Customer ID
   fundingSourceName: string; // Dwolla Funding Source Name
   plaidToken: string; // Plaid Account Processor Token
-  _links: object; // Dwolla On Demand Authorization Link
+  _links?: object; // Optional Dwolla authorization links
 }
 
 declare interface CreateTransactionProps {
@@ -303,6 +309,7 @@ declare interface getUserInfoProps {
 declare interface exchangePublicTokenProps {
   publicToken: string;
   user: User;
+  selectedAccountId?: string;
 }
 
 declare interface createBankAccountProps {

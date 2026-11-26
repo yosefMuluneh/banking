@@ -29,7 +29,12 @@ export const getAccounts = async ({ userId
         const accountsResponse = await plaidClient.accountsGet({
           access_token: bank.accessToken,
         });
-        const accountData = accountsResponse.data.accounts[0];
+        const accountData = accountsResponse.data.accounts.find(
+          (account) => account.account_id === bank.accountId
+        );
+
+        if (!accountData) return null;
+
         // get institution info from plaid
         const institution = await getInstitution({
           institutionId: accountsResponse.data.item.institution_id!,
@@ -55,12 +60,15 @@ export const getAccounts = async ({ userId
       })
     );
 
-    const totalBanks = accounts.length;
-    const totalCurrentBalance = accounts.reduce((total, account: any) => {
+    const validAccounts = accounts.filter(
+      (account): account is Account => account !== null
+    );
+    const totalBanks = validAccounts.length;
+    const totalCurrentBalance = validAccounts.reduce((total, account) => {
       return total + account.currentBalance;
     }, 0);
 
-    return parseStringify({ data: accounts, totalBanks, totalCurrentBalance });
+    return parseStringify({ data: validAccounts, totalBanks, totalCurrentBalance });
   } catch (error) {
     console.error("An error occurred while getting the accounts:", error);
     return parseStringify({ data: [], totalBanks: 0, totalCurrentBalance: 0 });
@@ -89,7 +97,13 @@ export const getAccount = async ({ appwriteItemId }: getAccountProps) => {
       access_token: bank.accessToken,
     });
 
-    const accountData = accountsResponse.data.accounts[0];
+    const accountData = accountsResponse.data.accounts.find(
+      (account) => account.account_id === bank.accountId
+    );
+
+    if (!accountData) {
+      return parseStringify({ data: null, transactions: [] });
+    }
 
     // get transfer transactions from appwrite
     const transferTransactionsData = await getTransactionsByBankId({
