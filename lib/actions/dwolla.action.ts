@@ -27,14 +27,26 @@ const getDwollaErrorMessage = (error: unknown) => {
   const dwollaError = error as {
     message?: string;
     body?: {
+      code?: string;
       message?: string;
-      _embedded?: { errors?: Array<{ message?: string }> };
+      _links?: { about?: { href?: string } };
+      _embedded?: { errors?: Array<{ code?: string; message?: string }> };
+    };
+    response?: {
+      data?: {
+        code?: string;
+        message?: string;
+        _links?: { about?: { href?: string } };
+        _embedded?: { errors?: Array<{ code?: string; message?: string }> };
+      };
     };
   };
 
   return (
     dwollaError.body?._embedded?.errors?.[0]?.message ??
     dwollaError.body?.message ??
+    dwollaError.response?.data?._embedded?.errors?.[0]?.message ??
+    dwollaError.response?.data?.message ??
     dwollaError.message ??
     "Dwolla could not complete the request."
   );
@@ -77,6 +89,11 @@ export const createFundingSource = async (
           message?: string;
           _links?: { about?: { href?: string } };
         };
+        data?: {
+          code?: string;
+          message?: string;
+          _links?: { about?: { href?: string } };
+        };
       };
       message?: string;
     };
@@ -84,7 +101,7 @@ export const createFundingSource = async (
     // Dwolla returns HTTP 400 with DuplicateResource when this bank is
     // already attached to the customer. Treat that as an idempotent success
     // and recover the existing funding-source URL instead of failing setup.
-    const body = dwollaError.body ?? dwollaError.response?.body;
+    const body = dwollaError.body ?? dwollaError.response?.body ?? dwollaError.response?.data;
     const duplicateMessage =
       body?.message ??
       body?._embedded?.errors?.[0]?.message ??
