@@ -91,7 +91,7 @@ export const createFundingSource = async (
       dwollaError.message ??
       "";
     const duplicateHref = body?._links?.about?.href;
-    const duplicateId = duplicateMessage.match(/Bank already exists:\\s*id=([a-f0-9-]+)/i)?.[1];
+    const duplicateId = duplicateMessage.match(/Bank already exists:\s*id=([a-f0-9-]+)/i)?.[1];
 
     if (
       body?.code === "DuplicateResource" ||
