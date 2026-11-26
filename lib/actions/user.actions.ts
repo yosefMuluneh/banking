@@ -15,7 +15,7 @@ const {
   APPWRITE_BANK_COLLECTION_ID: BANK_COLLECTION_ID,
 } = process.env;
 
-const getPlaidErrorMessage = (error: unknown) => {
+const getPlaidErrorDetails = (error: unknown) => {
   const plaidError = error as {
     message?: string;
     error_code?: string;
@@ -37,7 +37,10 @@ const getPlaidErrorMessage = (error: unknown) => {
     plaidError.message ||
     "Plaid could not complete the bank-account request.";
 
-  return code ? `Plaid ${code}: ${message}` : message;
+  return {
+    code,
+    message: code ? `Plaid ${code}: ${message}` : message,
+  };
 };
 
 export const signUp = async ({password,...userData} : SignUpParams) => {
@@ -201,13 +204,28 @@ export const createBankAccount = async ({
   }
 }
 
-export const exchangePublicToken = async ({user, publicToken}:exchangePublicTokenProps) => {
+export const exchangePublicToken = async ({
+  user,
+  publicToken,
+  selectedAccountId,
+}: exchangePublicTokenProps) => {
   try {
     const response = await plaidClient.itemPublicTokenExchange({ public_token: publicToken });
     const {access_token, item_id} = response.data;
 
     const accountsResponse = await plaidClient.accountsGet({ access_token });
-    const accountData = accountsResponse.data.accounts[0];
+    const accounts = accountsResponse.data.accounts;
+    const accountData = selectedAccountId
+      ? accounts.find((account) => account.account_id === selectedAccountId)
+      : accounts[0];
+
+    if (!accountData) {
+      throw new Error(
+        selectedAccountId
+          ? "The account selected in Plaid Link could not be retrieved. Please reconnect the bank and select an account."
+          : "Plaid did not return an account for this bank connection."
+      );
+    }
 
     // Plaid bank linking remains independent of Dwolla. If a Dwolla
     // funding source cannot be created, still persist the Plaid connection
@@ -231,11 +249,14 @@ export const exchangePublicToken = async ({user, publicToken}:exchangePublicToke
           bankName: accountData.name
         }) || "";
       } catch (error) {
-        console.error("Plaid bank connected, but Dwolla funding source creation failed:", error);
-        fundingSourceError =
-          error instanceof Error
-            ? error.message
-            : "Dwolla could not create a funding source for this account.";
+        const details = getPlaidErrorDetails(error);
+        // Provider errors may contain request configuration with access tokens.
+        // Log only the sanitized provider code/message.
+        console.error(
+          "Plaid bank connected, but Dwolla funding source creation failed:",
+          details.message
+        );
+        fundingSourceError = details.message;
       }
     }
 
@@ -334,6 +355,7 @@ export const completeDwollaSandboxOnboarding = async () => {
   const banks = await getBanks({ userId: user.$id });
   const linkedBanks: string[] = [];
   const skippedBanks: string[] = [];
+  const unsupportedBanks: Array<{ bankName: string; reason: string }> = [];
   const failedBanks: Array<{ bankName: string; reason: string }> = [];
 
   for (const bank of banks as Bank[]) {
@@ -385,13 +407,23 @@ export const completeDwollaSandboxOnboarding = async () => {
 
       linkedBanks.push(bank.$id);
     } catch (error) {
-      const reason = getPlaidErrorMessage(error);
+      const details = getPlaidErrorDetails(error);
+      // INVALID_ACCOUNT_ID means Plaid does not permit this account to be used
+      // for money movement. The Plaid connection itself remains valid.
+      if (details.code === "INVALID_ACCOUNT_ID") {
+        unsupportedBanks.push({
+          bankName,
+          reason: details.message,
+        });
+        continue;
+      }
+
       // Do not log the full SDK error object: request configuration can contain
       // sensitive access tokens. Keep diagnostics limited to provider messages.
-      console.error(`Could not attach bank "${bankName}" to Dwolla:`, reason);
+      console.error(`Could not attach bank "${bankName}" to Dwolla:`, details.message);
       failedBanks.push({
         bankName,
-        reason,
+        reason: details.message,
       });
     }
   }
@@ -405,6 +437,7 @@ export const completeDwollaSandboxOnboarding = async () => {
     customerCreated: !user.dwollaCustomerId,
     linkedCount: linkedBanks.length,
     alreadyLinkedCount: skippedBanks.length,
+    unsupportedBanks,
     failedBanks,
     hasBanks: banks.length > 0,
   });
