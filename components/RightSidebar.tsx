@@ -34,12 +34,10 @@ const RightSidebar = ({
       <section className="banks min-w-0">
         <div className="flex w-full min-w-0 items-center justify-between gap-3">
           <h2 className="header-2">My Banks</h2>
-          {user.dwollaCustomerId && (
-            <Link href="/my-banks" className="flex shrink-0 items-center gap-2">
-              <Image src="/icons/plus.svg" height={20} width={20} alt="plus" />
-              <span className="text-14 font-semibold text-gray-600">Add Bank</span>
-            </Link>
-          )}
+          <Link href="/my-banks" className="flex shrink-0 items-center gap-2">
+            <Image src="/icons/plus.svg" height={20} width={20} alt="plus" />
+            <span className="text-14 font-semibold text-gray-600">Add Bank</span>
+          </Link>
         </div>
 
         {banks.length > 0 && (
