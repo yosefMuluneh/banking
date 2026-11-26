@@ -184,28 +184,33 @@ export const exchangePublicToken = async ({user, publicToken}:exchangePublicToke
     const accountsResponse = await plaidClient.accountsGet({ access_token });
     const accountData = accountsResponse.data.accounts[0];
 
-    // Plaid bank linking is independent of Dwolla onboarding. If the user
-    // already has a Dwolla customer, also create the Dwolla funding source;
-    // otherwise save the Plaid connection and allow Dwolla setup later.
+    // Plaid bank linking remains independent of Dwolla. If a Dwolla
+    // funding source cannot be created, still persist the Plaid connection
+    // and report the transfer setup issue separately to the UI.
     let fundingSourceurl = "";
+    let fundingSourceError: string | undefined;
 
     if (user.dwollaCustomerId) {
-      const request: ProcessorTokenCreateRequest = {
-        account_id: accountData.account_id,
-        processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
-        access_token
-      };
-      const processorTokenResponse = await plaidClient.processorTokenCreate(request);
-      const processorToken = processorTokenResponse.data.processor_token;
+      try {
+        const request: ProcessorTokenCreateRequest = {
+          account_id: accountData.account_id,
+          processor: 'dwolla' as ProcessorTokenCreateRequestProcessorEnum,
+          access_token
+        };
+        const processorTokenResponse = await plaidClient.processorTokenCreate(request);
+        const processorToken = processorTokenResponse.data.processor_token;
 
-      fundingSourceurl = await addFundingSource({
-        dwollaCustomerId: user.dwollaCustomerId,
-        processorToken,
-        bankName: accountData.name
-      }) || "";
-
-      if (!fundingSourceurl) {
-        throw new Error("The bank was linked, but its Dwolla funding source could not be created.");
+        fundingSourceurl = await addFundingSource({
+          dwollaCustomerId: user.dwollaCustomerId,
+          processorToken,
+          bankName: accountData.name
+        }) || "";
+      } catch (error) {
+        console.error("Plaid bank connected, but Dwolla funding source creation failed:", error);
+        fundingSourceError =
+          error instanceof Error
+            ? error.message
+            : "Dwolla could not create a funding source for this account.";
       }
     }
 
@@ -220,7 +225,11 @@ export const exchangePublicToken = async ({user, publicToken}:exchangePublicToke
 
     if(!bankAccount) throw new Error('Error creating bank account');
     revalidatePath('/');
-    return parseStringify({ publicTokenExchange: 'Bank account added successfully' });
+    return parseStringify({
+      publicTokenExchange: 'Bank account added successfully',
+      fundingSourceLinked: Boolean(fundingSourceurl),
+      fundingSourceError,
+    });
   } catch (error) {
     console.error('Error', error);
     throw error instanceof Error ? error : new Error("Unable to connect this bank account.");
