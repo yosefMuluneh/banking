@@ -30,11 +30,12 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
     } catch (error) {
       console.error('Error creating Plaid Link token:', error)
       setToken('')
+      showToast('Unable to prepare the bank connection. Please try again.', 'error')
       return false
     } finally {
       setIsTokenLoading(false)
     }
-  }, [user])
+  }, [user, showToast])
 
   useEffect(() => {
     void refreshLinkToken()
@@ -93,7 +94,18 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
   }
 
   const { open, ready } = usePlaidLink(config)
-  const isDisabled = !ready || isLoading || isTokenLoading || !token
+  const handleConnectClick = useCallback(() => {
+    if (token) {
+      open()
+      return
+    }
+
+    void refreshLinkToken()
+  }, [token, open, refreshLinkToken])
+
+  // A failed token request should not leave the Connect button permanently
+  // disabled. Let the user retry; only require Plaid readiness when a token exists.
+  const isDisabled = isLoading || isTokenLoading || (Boolean(token) && !ready)
 
   const buttonContent = isLoading ? (
     <>
@@ -105,13 +117,15 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
       <Loader2 size={20} className='animate-spin' />
       &nbsp; Loading...
     </>
+  ) : !token ? (
+    'Retry Connection'
   ) : (
     'Connect Bank'
   )
 
   if (variant === 'primary') {
     return (
-      <Button onClick={() => open()} disabled={isDisabled} className='plaidlink-primary'>
+      <Button onClick={handleConnectClick} disabled={isDisabled} className='plaidlink-primary'>
         {buttonContent}
       </Button>
     )
@@ -119,25 +133,25 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
 
   if (variant === 'ghost') {
     return (
-      <Button onClick={() => open()} variant='ghost' disabled={isDisabled} className='plaidlink-ghost'>
+      <Button onClick={handleConnectClick} variant='ghost' disabled={isDisabled} className='plaidlink-ghost'>
         {isLoading || isTokenLoading ? (
           <Loader2 size={20} className='animate-spin' />
         ) : (
           <Image src='/icons/connect-bank.svg' alt='connect bank' width={24} height={24} />
         )}
-        <p className='hidden text-[16px] font-semibold text-black-2 xl:block'>Connect Bank</p>
+        <p className='hidden text-[16px] font-semibold text-black-2 xl:block'>{token ? 'Connect Bank' : 'Retry Connection'}</p>
       </Button>
     )
   }
 
   return (
-    <Button onClick={() => open()} disabled={isDisabled} className='plaidlink-default'>
+    <Button onClick={handleConnectClick} disabled={isDisabled} className='plaidlink-default'>
       {isLoading || isTokenLoading ? (
         <Loader2 size={20} className='animate-spin' />
       ) : (
         <Image src='/icons/connect-bank.svg' alt='connect bank' width={24} height={24} />
       )}
-      <p className='text-[16px] font-semibold text-black-2'>Connect Bank</p>
+      <p className='text-[16px] font-semibold text-black-2'>{token ? 'Connect Bank' : 'Retry Connection'}</p>
     </Button>
   )
 }

@@ -18,28 +18,29 @@ const {
 const getPlaidErrorDetails = (error: unknown) => {
   const plaidError = error as {
     message?: string;
-    error_code?: string;
-    error_message?: string;
-    display_message?: string | null;
     response?: {
+      status?: number;
       data?: {
         error_code?: string;
         error_message?: string;
         display_message?: string | null;
+        request_id?: string;
       };
     };
   };
-  const details = plaidError.response?.data ?? plaidError;
-  const code = details.error_code;
+  const details = plaidError.response?.data;
+  const code = details?.error_code;
   const message =
-    details.display_message ||
-    details.error_message ||
+    details?.display_message ||
+    details?.error_message ||
     plaidError.message ||
     "Plaid could not complete the bank-account request.";
 
   return {
     code,
     message: code ? `Plaid ${code}: ${message}` : message,
+    requestId: details?.request_id,
+    status: plaidError.response?.status,
   };
 };
 
@@ -173,21 +174,31 @@ export async function logoutAccount () {
 
 export const createLinkToken = async (user: User) => {
   try {
-    const toenParams = {
-      user:{ client_user_id: user.$id },
-      client_name: `${user.firstName} ${user.lastName}`,
+    const tokenParams = {
+      user: { client_user_id: user.$id },
+      client_name: `${user.firstName} ${user.lastName}`.slice(0, 30),
       products: ['auth', 'transactions'] as Products[],
       language: 'en',
       country_codes: ['US'] as CountryCode[],
-      account_selection: 'single',
-    }
-    const response = await plaidClient.linkTokenCreate(toenParams);
-    return parseStringify({linkToken : response.data.link_token});
+    };
+
+    const response = await plaidClient.linkTokenCreate(tokenParams);
+    return parseStringify({ linkToken: response.data.link_token });
   } catch (error) {
-    console.error('Error', error);
-    throw new Error("Bank linking is currently unavailable.");
+    const details = getPlaidErrorDetails(error);
+
+    // Never log the full Axios/Plaid error: its request config includes
+    // PLAID-SECRET and may contain other sensitive request data.
+    console.error("Plaid Link token creation failed:", {
+      status: details.status,
+      code: details.code,
+      message: details.message,
+      requestId: details.requestId,
+    });
+
+    throw new Error("Bank linking is currently unavailable. Please try again later.");
   }
-}
+};
 
 export const createBankAccount = async ({
   userId, bankId, accountId, accessToken, shareableId, fundingSourceUrl
