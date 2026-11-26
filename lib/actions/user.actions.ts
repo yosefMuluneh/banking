@@ -15,6 +15,31 @@ const {
   APPWRITE_BANK_COLLECTION_ID: BANK_COLLECTION_ID,
 } = process.env;
 
+const getPlaidErrorMessage = (error: unknown) => {
+  const plaidError = error as {
+    message?: string;
+    error_code?: string;
+    error_message?: string;
+    display_message?: string | null;
+    response?: {
+      data?: {
+        error_code?: string;
+        error_message?: string;
+        display_message?: string | null;
+      };
+    };
+  };
+  const details = plaidError.response?.data ?? plaidError;
+  const code = details.error_code;
+  const message =
+    details.display_message ||
+    details.error_message ||
+    plaidError.message ||
+    "Plaid could not complete the bank-account request.";
+
+  return code ? `Plaid ${code}: ${message}` : message;
+};
+
 export const signUp = async ({password,...userData} : SignUpParams) => {
   let admin: Awaited<ReturnType<typeof createAdminClient>> | undefined;
   let createdUserId: string | undefined;
@@ -360,13 +385,13 @@ export const completeDwollaSandboxOnboarding = async () => {
 
       linkedBanks.push(bank.$id);
     } catch (error) {
-      console.error("Could not attach an existing bank to Dwolla:", error);
+      const reason = getPlaidErrorMessage(error);
+      // Do not log the full SDK error object: request configuration can contain
+      // sensitive access tokens. Keep diagnostics limited to provider messages.
+      console.error(`Could not attach bank "${bankName}" to Dwolla:`, reason);
       failedBanks.push({
         bankName,
-        reason:
-          error instanceof Error
-            ? error.message
-            : "Dwolla could not create a funding source for this bank.",
+        reason,
       });
     }
   }
