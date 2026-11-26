@@ -179,12 +179,13 @@ export const createLinkToken = async (user: User) => {
       products: ['auth', 'transactions'] as Products[],
       language: 'en',
       country_codes: ['US'] as CountryCode[],
-      account_selection: 'single',
     }
     const response = await plaidClient.linkTokenCreate(toenParams);
     return parseStringify({linkToken : response.data.link_token});
   } catch (error) {
-    console.error('Error', error);
+    const details = getPlaidErrorDetails(error);
+    // Avoid logging the full Axios error: its request config contains Plaid credentials.
+    console.error("Error creating Plaid Link token:", details.message);
     throw new Error("Bank linking is currently unavailable.");
   }
 }
