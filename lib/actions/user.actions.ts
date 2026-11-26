@@ -236,13 +236,17 @@ export const getBanks = async ({userId}:getBanksProps) => {
 
 export const getBank = async ({documentId}:getBankProps) => {
   try {
+    if (!documentId) return null;
+
     const { database } = await createAdminClient();
-    const bank = await database.listDocuments(
-      DATABASE_ID!, BANK_COLLECTION_ID!, [Query.equal('$id', [documentId])]
+    const bank = await database.getDocument(
+      DATABASE_ID!,
+      BANK_COLLECTION_ID!,
+      documentId
     );
-    return parseStringify(bank.documents[0]);
+    return parseStringify(bank);
   } catch (error) {
-    console.error('Error', error);
+    console.error('Error getting bank document:', error);
     return null;
   }
 }
