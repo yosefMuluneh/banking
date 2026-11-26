@@ -66,7 +66,7 @@ const PaymentTransfer = async () => {
     <section className="payment-transfer">
       <HeaderBox
         title="Payment Transfer"
-        subtext="Provide the recipient details and amount for your sandbox transfer."
+        subtext="Provide the recipient details and amount. Both parties need a Dwolla sandbox customer and a linked checking or savings account."
       />
       <section className="size-full pt-5">
         <PaymentTransferForm accounts={accountsData} />
