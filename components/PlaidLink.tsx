@@ -46,13 +46,20 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
       showToast('Connecting your bank account...', 'loading')
 
       try {
-        await exchangePublicToken({
+        const exchangeResult = await exchangePublicToken({
           publicToken,
           user,
         })
 
         dismissAllOfType('loading')
-        showToast('Bank account connected successfully!', 'success')
+        if (exchangeResult?.fundingSourceError) {
+          showToast(
+            'Your bank was connected, but Dwolla could not enable transfers for it. You can retry setup from Transfer Funds.',
+            'error'
+          )
+        } else {
+          showToast('Bank account connected successfully!', 'success')
+        }
 
         // A successful exchange consumes the current Link token. Fetch a new
         // one before leaving so the persistent sidebar can connect more banks.
