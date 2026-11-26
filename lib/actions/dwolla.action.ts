@@ -64,6 +64,51 @@ export const createFundingSource = async (
 
     return fundingSourceUrl;
   } catch (error) {
+    const dwollaError = error as {
+      body?: {
+        code?: string;
+        message?: string;
+        _links?: { about?: { href?: string } };
+        _embedded?: { errors?: Array<{ code?: string; message?: string }> };
+      };
+      response?: {
+        body?: {
+          code?: string;
+          message?: string;
+          _links?: { about?: { href?: string } };
+        };
+      };
+      message?: string;
+    };
+
+    // Dwolla returns HTTP 400 with DuplicateResource when this bank is
+    // already attached to the customer. Treat that as an idempotent success
+    // and recover the existing funding-source URL instead of failing setup.
+    const body = dwollaError.body ?? dwollaError.response?.body;
+    const duplicateMessage =
+      body?.message ??
+      body?._embedded?.errors?.[0]?.message ??
+      dwollaError.message ??
+      "";
+    const duplicateHref = body?._links?.about?.href;
+    const duplicateId = duplicateMessage.match(/Bank already exists:\\s*id=([a-f0-9-]+)/i)?.[1];
+
+    if (
+      body?.code === "DuplicateResource" ||
+      /Bank already exists/i.test(duplicateMessage)
+    ) {
+      const existingFundingSourceUrl =
+        duplicateHref ??
+        (duplicateId
+          ? `https://api-${getEnvironment() === "sandbox" ? "sandbox." : ""}dwolla.com/funding-sources/${duplicateId}`
+          : "");
+
+      if (existingFundingSourceUrl) {
+        console.info("Dwolla funding source already exists; reusing it.");
+        return existingFundingSourceUrl;
+      }
+    }
+
     console.error("Creating a Dwolla funding source failed:", error);
     throw new Error(`Dwolla could not link this bank: ${getDwollaErrorMessage(error)}`);
   }
