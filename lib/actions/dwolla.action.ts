@@ -100,7 +100,7 @@ export const createFundingSource = async (
       const existingFundingSourceUrl =
         duplicateHref ??
         (duplicateId
-          ? `https://api-${getEnvironment() === "sandbox" ? "sandbox." : ""}dwolla.com/funding-sources/${duplicateId}`
+          ? `${getEnvironment() === "sandbox" ? "https://api-sandbox.dwolla.com" : "https://api.dwolla.com"}/funding-sources/${duplicateId}`
           : "");
 
       if (existingFundingSourceUrl) {
