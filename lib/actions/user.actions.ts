@@ -293,6 +293,10 @@ export const completeDwollaSandboxOnboarding = async () => {
     );
   }
 
+  if (!customerId) {
+    throw new Error("Dwolla customer setup did not return a customer ID.");
+  }
+
   const banks = await getBanks({ userId: user.$id });
   const linkedBanks: string[] = [];
   const skippedBanks: string[] = [];
