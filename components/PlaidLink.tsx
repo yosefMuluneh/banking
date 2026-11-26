@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useCallback, useEffect, useState } from 'react'
 import { Button } from './ui/button'
 import { Loader2 } from 'lucide-react'
@@ -7,104 +9,126 @@ import { createLinkToken, exchangePublicToken } from '@/lib/actions/user.actions
 import Image from 'next/image'
 import { useToast } from '@/components/ui/toast'
 
-const PlaidLink = ({ user, variant}:PlaidLinkProps) => {
+const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
+  const router = useRouter()
+  const { showToast, dismissAllOfType } = useToast()
+  const [token, setToken] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [isTokenLoading, setIsTokenLoading] = useState(true)
 
-    const router = useRouter()
-    const { showToast, dismissAllOfType } = useToast()
-    const [token, setToken] = useState('')
-    const [isLoading, setIsLoading] = useState(false)
+  // Link tokens are consumed during a successful public-token exchange.
+  // Keep this component ready for the user's next bank connection.
+  const refreshLinkToken = useCallback(async () => {
+    setIsTokenLoading(true)
 
-    useEffect(()=>{
-        const fetchToken = async () => {
-            try {
-                const data = await createLinkToken(user)
-                setToken(data?.linkToken || '')
-            } catch (error) {
-                console.error('Error creating link token:', error)
-                showToast('Failed to initialize bank connection. Please try again.', 'error')
-            }
-        }
-        fetchToken()
-    },[user, showToast])
+    try {
+      const data = await createLinkToken(user)
+      if (!data?.linkToken) throw new Error('Plaid did not return a Link token')
 
-    const onSuccess = useCallback<PlaidLinkOnSuccess>(async (public_token : string)=>{
-        setIsLoading(true)
-        showToast('Connecting your bank account...', 'loading')
-        try {
-            await exchangePublicToken({
-                publicToken: public_token, 
-                user,
-            })
-            dismissAllOfType('loading')
-            showToast('Bank account connected successfully!', 'success')
-            router.push('/my-banks')
-        } catch (error) {
-            console.error('Error exchanging public token:', error)
-            dismissAllOfType('loading')
-            showToast('Failed to connect bank account. Please try again.', 'error')
-            setIsLoading(false)
-        }
-    },[user, router, showToast, dismissAllOfType])
-
-
-    const config: PlaidLinkOptions = {
-        token,
-        onSuccess
+      setToken(data.linkToken)
+      return true
+    } catch (error) {
+      console.error('Error creating Plaid Link token:', error)
+      setToken('')
+      return false
+    } finally {
+      setIsTokenLoading(false)
     }
+  }, [user])
 
-    const { open, ready } = usePlaidLink(config)
+  useEffect(() => {
+    void refreshLinkToken()
+  }, [refreshLinkToken])
 
-    const isDisabled = !ready || isLoading || !token
+  const onSuccess = useCallback<PlaidLinkOnSuccess>(
+    async (publicToken: string) => {
+      setIsLoading(true)
+      showToast('Connecting your bank account...', 'loading')
 
-    return (
-        <>
-        {
-            variant === 'primary' ? (
-                <Button 
-                    onClick={() => open()}
-                    disabled={isDisabled}
-                    className='plaidlink-primary'
-                >
-                    {isLoading ? (
-                        <>
-                            <Loader2 size={20} className="animate-spin" /> &nbsp; Connecting...
-                        </>
-                    ) : !token ? (
-                        <>
-                            <Loader2 size={20} className="animate-spin" /> &nbsp; Loading...
-                        </>
-                    ) : 'Connect Bank'}
-                </Button>
-            ) : variant === 'ghost' ? (
-                <Button onClick={() => open()} variant='ghost' disabled={isDisabled} className='plaidlink-ghost'>
-                    {isLoading ? (
-                        <Loader2 size={20} className="animate-spin" />
-                    ) : (
-                        <Image 
-                            src='/icons/connect-bank.svg'
-                            alt='connect bank'
-                            width={24}
-                            height={24} />
-                    )}
-                    <p className='hidden xl:block text-[16px] font-semibold text-black-2'>Connect Bank</p>
-                </Button>
-            ) : (
-                <Button onClick={() => open()} disabled={isDisabled} className='plaidlink-default'>
-                    {isLoading ? (
-                        <Loader2 size={20} className="animate-spin" />
-                    ) : (
-                        <Image 
-                            src='/icons/connect-bank.svg'
-                            alt='connect bank'
-                            width={24}
-                            height={24} />
-                    )}
-                    <p className='text-[16px] font-semibold text-black-2'>Connect Bank</p>
-                </Button>
-            )
+      try {
+        await exchangePublicToken({
+          publicToken,
+          user,
+        })
+
+        dismissAllOfType('loading')
+        showToast('Bank account connected successfully!', 'success')
+
+        // A successful exchange consumes the current Link token. Fetch a new
+        // one before leaving so the persistent sidebar can connect more banks.
+        const refreshed = await refreshLinkToken()
+        if (!refreshed) {
+          showToast(
+            'Your bank was connected. Refresh the page before connecting another bank.',
+            'error'
+          )
         }
-        </>
+
+        router.push('/my-banks')
+      } catch (error) {
+        console.error('Error exchanging public token:', error)
+        dismissAllOfType('loading')
+        showToast('Failed to connect bank account. Please try again.', 'error')
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [user, router, showToast, dismissAllOfType, refreshLinkToken]
+  )
+
+  const config: PlaidLinkOptions = {
+    token,
+    onSuccess,
+  }
+
+  const { open, ready } = usePlaidLink(config)
+  const isDisabled = !ready || isLoading || isTokenLoading || !token
+
+  const buttonContent = isLoading ? (
+    <>
+      <Loader2 size={20} className='animate-spin' />
+      &nbsp; Connecting...
+    </>
+  ) : isTokenLoading ? (
+    <>
+      <Loader2 size={20} className='animate-spin' />
+      &nbsp; Loading...
+    </>
+  ) : (
+    'Connect Bank'
+  )
+
+  if (variant === 'primary') {
+    return (
+      <Button onClick={() => open()} disabled={isDisabled} className='plaidlink-primary'>
+        {buttonContent}
+      </Button>
     )
+  }
+
+  if (variant === 'ghost') {
+    return (
+      <Button onClick={() => open()} variant='ghost' disabled={isDisabled} className='plaidlink-ghost'>
+        {isLoading || isTokenLoading ? (
+          <Loader2 size={20} className='animate-spin' />
+        ) : (
+          <Image src='/icons/connect-bank.svg' alt='connect bank' width={24} height={24} />
+        )}
+        <p className='hidden text-[16px] font-semibold text-black-2 xl:block'>Connect Bank</p>
+      </Button>
+    )
+  }
+
+  return (
+    <Button onClick={() => open()} disabled={isDisabled} className='plaidlink-default'>
+      {isLoading || isTokenLoading ? (
+        <Loader2 size={20} className='animate-spin' />
+      ) : (
+        <Image src='/icons/connect-bank.svg' alt='connect bank' width={24} height={24} />
+      )}
+      <p className='text-[16px] font-semibold text-black-2'>Connect Bank</p>
+    </Button>
+  )
 }
 
 export default PlaidLink
