@@ -95,7 +95,7 @@ const DwollaOnboarding = ({
           Synthetic test profile used
         </h3>
         <div className="grid grid-cols-1 gap-3 rounded-xl bg-gray-50 p-4 text-sm sm:grid-cols-2">
-          <p><span className="text-gray-500">Name:</span> Sandbox Tester</p>
+          <p><span className="text-gray-500">Name:</span> verified Customer</p>
           <p><span className="text-gray-500">Address:</span> 9876 Million Dollar St</p>
           <p><span className="text-gray-500">City / State:</span> Des Moines, IA</p>
           <p><span className="text-gray-500">ZIP:</span> 50265</p>
