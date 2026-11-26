@@ -51,6 +51,9 @@ const AuthForm = ({ type } : { type : string }) => {
                     password: data.password
                 }
                 const newUser = await signUp(userData)
+                if (!newUser) {
+                    throw new Error('Account creation did not complete. Please try again.')
+                }
                 setUser(newUser)
                 dismissAllOfType('loading')
                 showToast('Account created successfully! Connect your bank to continue.', 'success')
@@ -71,7 +74,7 @@ const AuthForm = ({ type } : { type : string }) => {
         } catch (error) {
             console.error("Form submission error:", error)
             dismissAllOfType('loading')
-            showToast('Something went wrong. Please try again.', 'error')
+            showToast(error instanceof Error ? error.message : 'Something went wrong. Please try again.', 'error')
         } finally {
             setLoading(false)
         }

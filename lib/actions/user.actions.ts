@@ -66,8 +66,9 @@ export const signUp = async ({password,...userData} : SignUpParams) => {
       });
 
       return parseStringify(newUser);
-    }catch(error){
-        console.error('Error', error)
+    } catch (error) {
+      console.error('Sign-up failed:', error);
+      throw new Error('Unable to create your account. Please try again or contact support if the problem continues.');
     }
 }
 
