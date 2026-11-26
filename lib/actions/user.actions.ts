@@ -7,7 +7,7 @@ import { encryptId, parseStringify } from "../utils";
 import { CountryCode, ProcessorTokenCreateRequestProcessorEnum, Products, ProcessorTokenCreateRequest } from "plaid";
 import { plaidClient } from "../plaid";
 import { revalidatePath } from "next/cache";
-import { addFundingSource } from "./dwolla.action";
+import { addFundingSource, createDwollaCustomer } from "./dwolla.action";
 
 const {
   APPWRITE_DATABASE_ID: DATABASE_ID,
@@ -239,6 +239,135 @@ export const getBanks = async ({userId}:getBanksProps) => {
     return [];
   }
 }
+
+// Create a synthetic Dwolla personal customer in Sandbox and attach
+// any existing Plaid-linked checking/savings accounts as funding sources.
+// No real identity data is collected or persisted by this portfolio flow.
+export const completeDwollaSandboxOnboarding = async () => {
+  const user = await getLoggedInUser();
+
+  if (!user) {
+    throw new Error("Your session has expired. Please sign in again.");
+  }
+
+  if (process.env.DWOLLA_ENV !== "sandbox") {
+    throw new Error("Dwolla sandbox onboarding is available only when DWOLLA_ENV=sandbox.");
+  }
+
+  const { database } = await createAdminClient();
+  let customerId = user.dwollaCustomerId;
+  let customerUrl = user.dwollaCustomerUrl;
+
+  if (!customerId) {
+    const sandboxCustomer: NewDwollaCustomerParams = {
+      firstName: "Sandbox",
+      lastName: "Tester",
+      email: `sandbox-${user.$id}@example.com`,
+      type: "personal",
+      address1: "9876 Million Dollar St",
+      city: "Des Moines",
+      state: "IA",
+      postalCode: "50265",
+      dateOfBirth: "1980-01-01",
+      ssn: "1234",
+      ipAddress: "143.156.7.8",
+    };
+
+    customerUrl = await createDwollaCustomer(sandboxCustomer);
+    const customerIdFromUrl = customerUrl.match(/\/customers\/([^/?#]+)/)?.[1];
+
+    if (!customerIdFromUrl) {
+      throw new Error("Dwolla created a customer but returned an invalid customer URL.");
+    }
+
+    customerId = customerIdFromUrl;
+
+    await database.updateDocument(
+      DATABASE_ID!,
+      USER_COLLECTION_ID!,
+      user.$id,
+      {
+        dwollaCustomerId: customerId,
+        dwollaCustomerUrl: customerUrl,
+      }
+    );
+  }
+
+  const banks = await getBanks({ userId: user.$id });
+  const linkedBanks: string[] = [];
+  const skippedBanks: string[] = [];
+  const failedBanks: Array<{ bankName: string; reason: string }> = [];
+
+  for (const bank of banks as Bank[]) {
+    if (bank.fundingSourceUrl) {
+      skippedBanks.push(bank.$id);
+      continue;
+    }
+
+    try {
+      const accountsResponse = await plaidClient.accountsGet({
+        access_token: bank.accessToken,
+      });
+      const account = accountsResponse.data.accounts.find(
+        (item) => item.account_id === bank.accountId
+      );
+
+      if (!account) {
+        throw new Error("The linked Plaid account could not be found.");
+      }
+
+      if (
+        account.type !== "depository" ||
+        !["checking", "savings"].includes(account.subtype ?? "")
+      ) {
+        throw new Error("Dwolla funding sources require a checking or savings account.");
+      }
+
+      const processorTokenResponse = await plaidClient.processorTokenCreate({
+        access_token: bank.accessToken,
+        account_id: bank.accountId,
+        processor: "dwolla" as ProcessorTokenCreateRequestProcessorEnum,
+      });
+
+      const fundingSourceUrl = await addFundingSource({
+        dwollaCustomerId: customerId,
+        processorToken: processorTokenResponse.data.processor_token,
+        bankName: account.name,
+      });
+
+      await database.updateDocument(
+        DATABASE_ID!,
+        BANK_COLLECTION_ID!,
+        bank.$id,
+        { fundingSourceUrl }
+      );
+
+      linkedBanks.push(bank.$id);
+    } catch (error) {
+      console.error("Could not attach an existing bank to Dwolla:", error);
+      failedBanks.push({
+        bankName: bank.$id,
+        reason:
+          error instanceof Error
+            ? error.message
+            : "Dwolla could not create a funding source for this bank.",
+      });
+    }
+  }
+
+  revalidatePath("/");
+  revalidatePath("/my-banks");
+  revalidatePath("/payment-transfer");
+
+  return parseStringify({
+    customerId,
+    customerCreated: !user.dwollaCustomerId,
+    linkedCount: linkedBanks.length,
+    alreadyLinkedCount: skippedBanks.length,
+    failedBanks,
+    hasBanks: banks.length > 0,
+  });
+};
 
 export const getBank = async ({documentId}:getBankProps) => {
   try {
