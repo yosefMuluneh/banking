@@ -4,7 +4,8 @@ import RightSidebar from '@/components/RightSidebar'
 import TotalBalanceBox from '@/components/TotalBalanceBox'
 import { getAccount, getAccounts } from '@/lib/actions/bank.action'
 import { getLoggedInUser } from '@/lib/actions/user.actions'
-import React from 'react'\nimport { redirect } from 'next/navigation'
+import React from 'react'
+import { redirect } from 'next/navigation'
 
 const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
   const currentPage = Number(page as string) || 1
