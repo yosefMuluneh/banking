@@ -15,6 +15,8 @@ const PlaidLink = ({ user, variant}:PlaidLinkProps) => {
     const [isLoading, setIsLoading] = useState(false)
 
     useEffect(()=>{
+        if (!user.dwollaCustomerId) return;
+
         const fetchToken = async () => {
             try {
                 const data = await createLinkToken(user)
@@ -53,6 +55,8 @@ const PlaidLink = ({ user, variant}:PlaidLinkProps) => {
     }
 
     const { open, ready } = usePlaidLink(config)
+
+    if (!user.dwollaCustomerId) return null
 
     const isDisabled = !ready || isLoading || !token
 

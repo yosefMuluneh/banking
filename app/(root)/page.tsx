@@ -5,10 +5,13 @@ import TotalBalanceBox from '@/components/TotalBalanceBox'
 import { getAccount, getAccounts } from '@/lib/actions/bank.action'
 import { getLoggedInUser } from '@/lib/actions/user.actions'
 import React from 'react'
+import { redirect } from 'next/navigation'
 
 const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
   const currentPage = Number(page as string) || 1
   const loggedIn = await getLoggedInUser()
+  if (!loggedIn) redirect('/sign-in')
+
   const accounts = await getAccounts({ userId: loggedIn.$id })
 
   if(!accounts) return;
@@ -18,12 +21,20 @@ const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
 
   const appwriteItemId = (id as string) || accountsData[0]?.appwriteItemId
 
-
-  const account = await getAccount({ appwriteItemId })
+  // New users can have a valid Horizon profile without a linked bank account.
+  // Only fetch Plaid account details when a bank document ID exists.
+  const account = appwriteItemId
+    ? await getAccount({ appwriteItemId })
+    : null
   
   return (
     <section className='home'>
       <div className='home-content'>
+        {accountsData.length === 0 && (
+          <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900'>
+            Your Horizon account is ready. Bank connections and transfers will be enabled when a banking provider is available for your country.
+          </div>
+        )}
         <header className='home-header'>
           <HeaderBox 
             type="greeting"
@@ -41,7 +52,7 @@ const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
 
         <RecentTransactions 
           accounts = {accountsData}
-          transactions = {account?.transactions}
+          transactions = {account?.transactions ?? []}
           appwriteItemId={appwriteItemId}
           page={currentPage}
 
