@@ -187,10 +187,21 @@ export function decryptId(id: string) {
   return atob(id);
 }
 
-export const getTransactionStatus = (date: Date) => {
-  const today = new Date();
-  const twoDaysAgo = new Date(today);
-  twoDaysAgo.setDate(today.getDate() - 2);
+export const getTransactionStatus = (
+  transaction: Pick<Transaction, "date" | "pending" | "status">
+) => {
+  if (transaction.status) {
+    return transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1).toLowerCase();
+  }
+
+  if (transaction.pending === true) return "Pending";
+  if (transaction.pending === false) return "Success";
+
+  // Legacy Appwrite transfer records do not have Plaid's pending flag.
+  // Preserve the existing visual status fallback for those records.
+  const date = new Date(transaction.date);
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
   return date > twoDaysAgo ? "Processing" : "Success";
 };
