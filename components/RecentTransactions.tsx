@@ -3,6 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useMemo, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { getTransactionStatus } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BankTabItem } from "./BankTabItem";
 import BankInfo from "./BankInfo";
@@ -21,7 +22,7 @@ const RecentTransactions = ({
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(page);
 
   const selectedBankId = appwriteItemId || accounts[0]?.appwriteItemId || "";
@@ -48,7 +49,7 @@ const RecentTransactions = ({
           transaction.name,
           transaction.category,
           transaction.paymentChannel,
-          transaction.type,
+          getTransactionStatus(transaction),
         ]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(normalizedSearch));
@@ -56,12 +57,13 @@ const RecentTransactions = ({
       const matchesCategory =
         categoryFilter === "all" || transaction.category === categoryFilter;
 
-      const matchesType =
-        typeFilter === "all" || transaction.type?.toLowerCase() === typeFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        getTransactionStatus(transaction).toLowerCase() === statusFilter;
 
-      return matchesSearch && matchesCategory && matchesType;
+      return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [transactions, search, categoryFilter, typeFilter]);
+  }, [transactions, search, categoryFilter, statusFilter]);
 
   const rowsPerPage = 10;
   const totalPages = Math.ceil(filteredTransactions.length / rowsPerPage);
@@ -96,7 +98,7 @@ const RecentTransactions = ({
   const resetFilters = () => {
     setSearch("");
     setCategoryFilter("all");
-    setTypeFilter("all");
+    setStatusFilter("all");
     setCurrentPage(1);
   };
 
@@ -178,18 +180,19 @@ const RecentTransactions = ({
                   </label>
 
                   <label className="flex min-w-0 flex-col gap-1">
-                    <span className="text-12 font-medium text-gray-600">Transaction type</span>
+                    <span className="text-12 font-medium text-gray-600">Transaction status</span>
                     <select
-                      value={typeFilter}
+                      value={statusFilter}
                       onChange={(event) => {
-                        setTypeFilter(event.target.value);
+                        setStatusFilter(event.target.value);
                         setCurrentPage(1);
                       }}
                       className="h-10 min-w-0 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                     >
-                      <option value="all">All types</option>
-                      <option value="debit">Money out</option>
-                      <option value="credit">Money in</option>
+                      <option value="all">All statuses</option>
+                      <option value="success">Success</option>
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
                     </select>
                   </label>
                 </div>
@@ -200,7 +203,7 @@ const RecentTransactions = ({
                     {"–"}
                     {Math.min(safePage * rowsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
                   </p>
-                  {(search || categoryFilter !== "all" || typeFilter !== "all") && (
+                  {(search || categoryFilter !== "all" || statusFilter !== "all") && (
                     <button
                       type="button"
                       onClick={resetFilters}
