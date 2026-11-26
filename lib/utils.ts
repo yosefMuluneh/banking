@@ -223,9 +223,9 @@ export const transferFormSchema = () =>
     amount: z
       .string()
       .trim()
-      .regex(/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/, "Enter a valid amount with up to 2 decimal places")
+      .regex(/^(?:0|[1-9]\d*)(?:\.\d{1,2})?$/, "Enter a valid amount with up to 2 decimal places")
       .refine((value) => Number(value) > 0, "Amount must be greater than zero"),
     senderBank: z.string().min(1, "Please select a source bank account"),
     sharableId: z.string().trim().min(8, "Enter a valid recipient shareable ID"),
-  });;
+  });
 
