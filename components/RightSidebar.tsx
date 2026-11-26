@@ -43,7 +43,7 @@ const RightSidebar = ({
         </div>
 
         {banks.length > 0 && (
-          <div className="relative flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-5 overflow-hidden">
+          <div className="relative flex min-h-[222px] w-full min-w-0 flex-1 flex-col items-center justify-center gap-5">
             <div className="relative z-10 w-full max-w-[320px]">
               <BankCard
                 key={banks[0].$id}
