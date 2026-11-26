@@ -68,7 +68,8 @@ declare type Transaction = {
   type: string;
   accountId: string;
   amount: number;
-  pending: boolean;
+  pending?: boolean;
+  status?: string;
   category: string;
   date: string;
   image: string;
