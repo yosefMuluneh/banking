@@ -48,8 +48,9 @@ const AuthForm = ({ type } : { type : string }) => {
 
                 dismissAllOfType('loading')
                 showToast('Your Horizon account has been created.', 'success')
-                router.push('/')
-                router.refresh()
+                // The signup action sets the session cookie. A full navigation
+                // ensures the dashboard request is made with that new cookie.
+                window.location.assign('/')
             } else {
                 const loggedIn = await signIn({
                     email: data.email,
