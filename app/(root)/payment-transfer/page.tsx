@@ -16,9 +16,17 @@ const PaymentTransfer = async () => {
     getBanks({ userId: loggedIn.$id }),
   ]);
   const accountsData = accounts?.data ?? [];
+  // A single unsupported Plaid account must not block transfers when the
+  // user already has at least one usable Dwolla funding source.
+  const eligibleBanks = (bankDocuments as Bank[]).filter(
+    (bank) => Boolean(bank.fundingSourceUrl)
+  );
+  const eligibleBankIds = new Set(eligibleBanks.map((bank) => bank.$id));
+  const transferAccounts = accountsData.filter((account: Account) =>
+    eligibleBankIds.has(account.appwriteItemId)
+  );
   const needsDwollaSetup =
-    !loggedIn.dwollaCustomerId ||
-    (bankDocuments as Bank[]).some((bank) => !bank.fundingSourceUrl);
+    !loggedIn.dwollaCustomerId || eligibleBanks.length === 0;
 
   if (needsDwollaSetup) {
     return (
@@ -37,7 +45,7 @@ const PaymentTransfer = async () => {
     );
   }
 
-  if (accountsData.length === 0) {
+  if (transferAccounts.length === 0) {
     return (
       <section className="payment-transfer">
         <HeaderBox
@@ -69,7 +77,7 @@ const PaymentTransfer = async () => {
         subtext="Provide the recipient details and amount. Both parties need a Dwolla sandbox customer and a linked checking or savings account."
       />
       <section className="size-full pt-5">
-        <PaymentTransferForm accounts={accountsData} />
+        <PaymentTransferForm accounts={transferAccounts} />
       </section>
     </section>
   );
