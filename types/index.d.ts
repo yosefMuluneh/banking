@@ -309,6 +309,7 @@ declare interface getUserInfoProps {
 declare interface exchangePublicTokenProps {
   publicToken: string;
   user: User;
+  selectedAccountId?: string;
 }
 
 declare interface createBankAccountProps {
