@@ -70,8 +70,19 @@ export const getAccounts = async ({ userId
 // Get one bank account
 export const getAccount = async ({ appwriteItemId }: getAccountProps) => {
   try {
+    // A missing ID means there is no bank account to retrieve.
+    if (!appwriteItemId) {
+      return parseStringify({ data: null, transactions: [] });
+    }
+
     // get bank from db
     const bank = await getBank({ documentId: appwriteItemId });
+
+    // New users may not have a linked bank, and a requested document may
+    // have been deleted. Never call Plaid without a valid access token.
+    if (!bank?.accessToken) {
+      return parseStringify({ data: null, transactions: [] });
+    }
 
     // get account info from plaid
     const accountsResponse = await plaidClient.accountsGet({
