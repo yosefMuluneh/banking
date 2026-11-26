@@ -26,7 +26,8 @@ export const createTransaction = async (transaction: CreateTransactionProps) => 
 
     return parseStringify(newTransaction);
   } catch (error) {
-    console.log(error);
+    console.error("Could not save transfer transaction:", error);
+    throw new Error("The transfer request was sent, but its transaction history could not be saved.");
   }
 }
 
