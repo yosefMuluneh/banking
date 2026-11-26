@@ -215,11 +215,17 @@ export const authFormSchema = (type: string) => z.object({
 })
 
 
-export const transferFormSchema = ()=>z.object({
-  email: z.string().email("Invalid email address"),
-  name: z.string().min(4, "Transfer note is too short"),
-  amount: z.string().min(4, "Amount is too short"),
-  senderBank: z.string().min(4, "Please select a valid bank account"),
-  sharableId: z.string().min(8, "Please select a valid sharable Id"),
-});
+export const transferFormSchema = () =>
+  z.object({
+    email: z.string().trim().email("Enter a valid recipient email address"),
+    // The transfer note is optional in the UI.
+    name: z.string().trim().max(140, "Transfer note must be 140 characters or fewer").optional(),
+    amount: z
+      .string()
+      .trim()
+      .regex(/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/, "Enter a valid amount with up to 2 decimal places")
+      .refine((value) => Number(value) > 0, "Amount must be greater than zero"),
+    senderBank: z.string().min(1, "Please select a source bank account"),
+    sharableId: z.string().trim().min(8, "Enter a valid recipient shareable ID"),
+  });;
 
