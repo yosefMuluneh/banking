@@ -79,7 +79,7 @@ const TransactionsTable = ({
             ))
           ) : transactions.length > 0 ? (
             transactions.map((transaction: Transaction) => {
-              const status = getTransactionStatus(new Date(transaction.date));
+              const status = getTransactionStatus(transaction);
               const amount = formatAmount(transaction.amount);
               const isDebit = transaction.type === "debit";
               const isCredit = transaction.type === "credit";
