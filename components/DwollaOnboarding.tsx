@@ -128,9 +128,9 @@ const DwollaOnboarding = ({
             Setting up sandbox...
           </>
         ) : (
-          {hasDwollaCustomer
+          hasDwollaCustomer
             ? "Complete sandbox bank setup"
-            : "Create sandbox customer and link banks"}
+            : "Create sandbox customer and link banks"
         )}
       </Button>
 
