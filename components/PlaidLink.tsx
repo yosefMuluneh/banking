@@ -41,7 +41,7 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
   }, [refreshLinkToken])
 
   const onSuccess = useCallback<PlaidLinkOnSuccess>(
-    async (publicToken: string) => {
+    async (publicToken, metadata) => {
       setIsLoading(true)
       showToast('Connecting your bank account...', 'loading')
 
@@ -49,6 +49,7 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
         const exchangeResult = await exchangePublicToken({
           publicToken,
           user,
+          selectedAccountId: metadata.accounts?.[0]?.id,
         })
 
         dismissAllOfType('loading')
