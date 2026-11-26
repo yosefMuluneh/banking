@@ -23,19 +23,49 @@ const dwollaClient = new Client({
   secret: process.env.DWOLLA_SECRET as string,
 });
 
-// Create a Dwolla Funding Source using a Plaid Processor Token
+const getDwollaErrorMessage = (error: unknown) => {
+  const dwollaError = error as {
+    message?: string;
+    body?: {
+      message?: string;
+      _embedded?: { errors?: Array<{ message?: string }> };
+    };
+  };
+
+  return (
+    dwollaError.body?._embedded?.errors?.[0]?.message ??
+    dwollaError.body?.message ??
+    dwollaError.message ??
+    "Dwolla could not complete the request."
+  );
+};
+
+// Create a Dwolla Funding Source using a Plaid Processor Token.
 export const createFundingSource = async (
   options: CreateFundingSourceOptions
 ) => {
+  if (!options.customerId || !options.plaidToken || !options.fundingSourceName) {
+    throw new Error("A Dwolla customer, Plaid processor token, and bank name are required.");
+  }
+
   try {
-    return await dwollaClient
-      .post(`customers/${options.customerId}/funding-sources`, {
+    const response = await dwollaClient.post(
+      `customers/${options.customerId}/funding-sources`,
+      {
         name: options.fundingSourceName,
         plaidToken: options.plaidToken,
-      })
-      .then((res) => res.headers.get("location"));
-  } catch (err) {
-    console.error("Creating a Funding Source Failed: ", err);
+      }
+    );
+    const fundingSourceUrl = response.headers.get("location");
+
+    if (!fundingSourceUrl) {
+      throw new Error("Dwolla did not return a funding source URL.");
+    }
+
+    return fundingSourceUrl;
+  } catch (error) {
+    console.error("Creating a Dwolla funding source failed:", error);
+    throw new Error(`Dwolla could not link this bank: ${getDwollaErrorMessage(error)}`);
   }
 };
 
@@ -55,11 +85,17 @@ export const createDwollaCustomer = async (
   newCustomer: NewDwollaCustomerParams
 ) => {
   try {
-    return await dwollaClient
-      .post("customers", newCustomer)
-      .then((res) => res.headers.get("location"));
-  } catch (err) {
-    console.error("Creating a Dwolla Customer Failed: ", err);
+    const response = await dwollaClient.post("customers", newCustomer);
+    const customerUrl = response.headers.get("location");
+
+    if (!customerUrl) {
+      throw new Error("Dwolla did not return a customer URL.");
+    }
+
+    return customerUrl;
+  } catch (error) {
+    console.error("Creating a Dwolla customer failed:", error);
+    throw new Error(`Dwolla customer setup failed: ${getDwollaErrorMessage(error)}`);
   }
 };
 
@@ -127,19 +163,9 @@ export const addFundingSource = async ({
   processorToken,
   bankName,
 }: AddFundingSourceParams) => {
-  try {
-    // create dwolla auth link
-    const dwollaAuthLinks = await createOnDemandAuthorization();
-
-    // add funding source to the dwolla customer & get the funding source url
-    const fundingSourceOptions = {
-      customerId: dwollaCustomerId,
-      fundingSourceName: bankName,
-      plaidToken: processorToken,
-      _links: dwollaAuthLinks,
-    };
-    return await createFundingSource(fundingSourceOptions);
-  } catch (err) {
-    console.error("Transfer fund failed: ", err);
-  }
+  return createFundingSource({
+    customerId: dwollaCustomerId,
+    fundingSourceName: bankName,
+    plaidToken: processorToken,
+  });
 };
