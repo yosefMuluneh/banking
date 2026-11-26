@@ -106,7 +106,7 @@ export const createTransfer = async ({
 }: TransferParams) => {
   if (!sourceFundingSourceUrl || !destinationFundingSourceUrl) {
     throw new Error(
-      "Both bank accounts must have Dwolla funding sources. Complete Dwolla setup and reconnect any bank that was linked before setup."
+      "Both bank accounts need Dwolla funding sources. The sender and recipient must complete sandbox setup and link supported checking or savings accounts."
     );
   }
 
