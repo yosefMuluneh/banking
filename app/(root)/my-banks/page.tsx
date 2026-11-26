@@ -24,7 +24,7 @@ const MyBanks = async () => {
         <div className='mt-8 space-y-6'>
           <div className='flex flex-wrap items-center justify-between gap-4'>
             <h2 className='header-2'>Your Bank Accounts</h2>
-            <PlaidLink user={loggedIn} variant='primary' />
+            {bankAccounts.length > 0 && <PlaidLink user={loggedIn} variant='primary' />}
           </div>
 
           {bankAccounts.length > 0 ? (
