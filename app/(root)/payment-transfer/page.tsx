@@ -2,7 +2,7 @@ import HeaderBox from "@/components/HeaderBox";
 import PaymentTransferForm from "@/components/PaymentTransferForm";
 import DwollaOnboarding from "@/components/DwollaOnboarding";
 import { getAccounts } from "@/lib/actions/bank.action";
-import { getLoggedInUser } from "@/lib/actions/user.actions";
+import { getBanks, getLoggedInUser } from "@/lib/actions/user.actions";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -11,10 +11,16 @@ const PaymentTransfer = async () => {
 
   if (!loggedIn) redirect("/sign-in");
 
-  const accounts = await getAccounts({ userId: loggedIn.$id });
+  const [accounts, bankDocuments] = await Promise.all([
+    getAccounts({ userId: loggedIn.$id }),
+    getBanks({ userId: loggedIn.$id }),
+  ]);
   const accountsData = accounts?.data ?? [];
+  const needsDwollaSetup =
+    !loggedIn.dwollaCustomerId ||
+    (bankDocuments as Bank[]).some((bank) => !bank.fundingSourceUrl);
 
-  if (!loggedIn.dwollaCustomerId) {
+  if (needsDwollaSetup) {
     return (
       <section className="payment-transfer">
         <HeaderBox
@@ -22,7 +28,10 @@ const PaymentTransfer = async () => {
           subtext="Complete the Dwolla sandbox setup before initiating a transfer."
         />
         <div className="size-full pt-5">
-          <DwollaOnboarding bankCount={accountsData.length} />
+          <DwollaOnboarding
+            bankCount={(bankDocuments as Bank[]).length}
+            hasDwollaCustomer={Boolean(loggedIn.dwollaCustomerId)}
+          />
         </div>
       </section>
     );
