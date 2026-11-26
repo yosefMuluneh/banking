@@ -35,7 +35,7 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
     } finally {
       setIsTokenLoading(false)
     }
-  }, [user])
+  }, [user, showToast])
 
   useEffect(() => {
     void refreshLinkToken()
