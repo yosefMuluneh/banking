@@ -133,6 +133,7 @@ declare type NewDwollaCustomerParams = {
   postalCode: string;
   dateOfBirth: string;
   ssn: string;
+  ipAddress: string;
 };
 
 declare interface CreditCardProps {
