@@ -16,7 +16,13 @@ type OnboardingResult = {
   hasBanks: boolean;
 };
 
-const DwollaOnboarding = ({ bankCount }: { bankCount: number }) => {
+const DwollaOnboarding = ({
+  bankCount,
+  hasDwollaCustomer,
+}: {
+  bankCount: number;
+  hasDwollaCustomer: boolean;
+}) => {
   const router = useRouter();
   const { showToast, dismissAllOfType } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -66,8 +72,9 @@ const DwollaOnboarding = ({ bankCount }: { bankCount: number }) => {
             Enable sandbox transfers
           </h2>
           <p className="mt-1 text-sm leading-6 text-gray-600">
-            Create a simulated Dwolla customer and connect your existing Plaid
-            banks as sandbox funding sources.
+            {hasDwollaCustomer
+              ? "Finish attaching your existing Plaid bank accounts as Dwolla sandbox funding sources."
+              : "Create a simulated Dwolla customer and connect your existing Plaid banks as sandbox funding sources."}
           </p>
         </div>
       </div>
@@ -121,7 +128,9 @@ const DwollaOnboarding = ({ bankCount }: { bankCount: number }) => {
             Setting up sandbox...
           </>
         ) : (
-          "Create sandbox customer and link banks"
+          {hasDwollaCustomer
+            ? "Complete sandbox bank setup"
+            : "Create sandbox customer and link banks"}
         )}
       </Button>
 
