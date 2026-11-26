@@ -12,6 +12,7 @@ type OnboardingResult = {
   customerCreated: boolean;
   linkedCount: number;
   alreadyLinkedCount: number;
+  unsupportedBanks: Array<{ bankName: string; reason: string }>;
   failedBanks: Array<{ bankName: string; reason: string }>;
   hasBanks: boolean;
 };
@@ -39,8 +40,13 @@ const DwollaOnboarding = ({
 
       if (response.failedBanks.length > 0) {
         showToast(
-          "Your sandbox customer is ready, but some bank accounts still need attention.",
+          "Your sandbox customer is ready, but some funding sources could not be attached.",
           "error"
+        );
+      } else if (response.unsupportedBanks.length > 0) {
+        showToast(
+          "Sandbox setup completed. Some connected accounts are not eligible for transfers.",
+          "success"
         );
       } else {
         showToast("Dwolla sandbox setup completed successfully.", "success");
@@ -141,12 +147,31 @@ const DwollaOnboarding = ({
             <li>New Dwolla customer: {result.customerCreated ? "Created" : "Already existed"}</li>
             <li>Bank funding sources created: {result.linkedCount}</li>
             <li>Already linked: {result.alreadyLinkedCount}</li>
+            <li>Not eligible for Dwolla transfers: {result.unsupportedBanks.length}</li>
           </ul>
           {!result.hasBanks && (
             <p className="mt-3 text-sm text-gray-600">
               Your sandbox customer is ready. Connect a US sandbox bank from My Banks;
               the app will create its Dwolla funding source automatically.
             </p>
+          )}
+          {result.unsupportedBanks.length > 0 && (
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-sm font-semibold text-amber-900">
+                Connected accounts not eligible for transfers
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-800">
+                {result.unsupportedBanks.map((bank, index) => (
+                  <li key={index}>{bank.bankName}: {bank.reason}</li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs leading-5 text-amber-800">
+                These Plaid connections remain available for balances and transactions.
+                Plaid does not permit these specific accounts to be used for money
+                movement. Connect another eligible US checking or savings account if
+                you need an additional transfer source.
+              </p>
+            </div>
           )}
           {result.failedBanks.length > 0 && (
             <div className="mt-4">
@@ -159,7 +184,8 @@ const DwollaOnboarding = ({
                 ))}
               </ul>
               <p className="mt-2 text-xs text-gray-500">
-                You can retry this setup after resolving the listed account issue.
+                These are setup errors rather than account-eligibility restrictions.
+                You can retry after resolving the listed issue.
               </p>
             </div>
           )}
