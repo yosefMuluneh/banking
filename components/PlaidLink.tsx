@@ -37,7 +37,7 @@ const PlaidLink = ({ user, variant}:PlaidLinkProps) => {
             })
             dismissAllOfType('loading')
             showToast('Bank account connected successfully!', 'success')
-            router.push('/')
+            router.push('/my-banks')
         } catch (error) {
             console.error('Error exchanging public token:', error)
             dismissAllOfType('loading')
