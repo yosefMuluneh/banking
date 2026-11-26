@@ -299,6 +299,8 @@ export const completeDwollaSandboxOnboarding = async () => {
   const failedBanks: Array<{ bankName: string; reason: string }> = [];
 
   for (const bank of banks as Bank[]) {
+    let bankName = bank.$id;
+
     if (bank.fundingSourceUrl) {
       skippedBanks.push(bank.$id);
       continue;
@@ -315,6 +317,7 @@ export const completeDwollaSandboxOnboarding = async () => {
       if (!account) {
         throw new Error("The linked Plaid account could not be found.");
       }
+      bankName = account.name;
 
       if (
         account.type !== "depository" ||
@@ -346,7 +349,7 @@ export const completeDwollaSandboxOnboarding = async () => {
     } catch (error) {
       console.error("Could not attach an existing bank to Dwolla:", error);
       failedBanks.push({
-        bankName: bank.$id,
+        bankName,
         reason:
           error instanceof Error
             ? error.message
