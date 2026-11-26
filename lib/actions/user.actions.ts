@@ -260,8 +260,8 @@ export const completeDwollaSandboxOnboarding = async () => {
 
   if (!customerId) {
     const sandboxCustomer: NewDwollaCustomerParams = {
-      firstName: "Sandbox",
-      lastName: "Tester",
+      firstName: "verified",
+      lastName: "Customer",
       email: `sandbox-${user.$id}@example.com`,
       type: "personal",
       address1: "9876 Million Dollar St",
