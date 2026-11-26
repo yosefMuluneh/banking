@@ -69,6 +69,9 @@ const PlaidLink = ({ user, variant }: PlaidLinkProps) => {
         console.error('Error exchanging public token:', error)
         dismissAllOfType('loading')
         showToast('Failed to connect bank account. Please try again.', 'error')
+        // The token may already have been consumed if the exchange succeeded
+        // but saving the bank failed, so prepare a fresh token for retry.
+        await refreshLinkToken()
       } finally {
         setIsLoading(false)
       }
