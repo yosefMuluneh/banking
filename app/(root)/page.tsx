@@ -21,8 +21,11 @@ const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
 
   const appwriteItemId = (id as string) || accountsData[0]?.appwriteItemId
 
-
-  const account = await getAccount({ appwriteItemId })
+  // New users can have a valid Horizon profile without a linked bank account.
+  // Only fetch Plaid account details when a bank document ID exists.
+  const account = appwriteItemId
+    ? await getAccount({ appwriteItemId })
+    : null
   
   return (
     <section className='home'>
@@ -49,7 +52,7 @@ const Home = async ({ searchParams : { id, page} } : SearchParamProps) => {
 
         <RecentTransactions 
           accounts = {accountsData}
-          transactions = {account?.transactions}
+          transactions = {account?.transactions ?? []}
           appwriteItemId={appwriteItemId}
           page={currentPage}
 
