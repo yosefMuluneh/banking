@@ -79,7 +79,7 @@ const PaymentTransferForm = ({ accounts }: PaymentTransferFormProps) => {
       }
       if (!senderBank.fundingSourceUrl || !receiverBank.fundingSourceUrl) {
         throw new Error(
-          "Both accounts need Dwolla funding sources before a transfer can be made. Banks linked before Dwolla setup may need to be reconnected."
+          "Both the sender and recipient must complete Dwolla sandbox setup and link a supported US checking or savings account."
         );
       }
 
