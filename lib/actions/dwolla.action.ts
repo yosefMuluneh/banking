@@ -68,26 +68,57 @@ export const createTransfer = async ({
   destinationFundingSourceUrl,
   amount,
 }: TransferParams) => {
+  if (!sourceFundingSourceUrl || !destinationFundingSourceUrl) {
+    throw new Error(
+      "Both bank accounts must have Dwolla funding sources. Complete Dwolla setup and reconnect any bank that was linked before setup."
+    );
+  }
+
+  const numericAmount = Number(amount);
+  if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    throw new Error("Enter a valid transfer amount greater than zero.");
+  }
+
   try {
     const requestBody = {
       _links: {
-        source: {
-          href: sourceFundingSourceUrl,
-        },
-        destination: {
-          href: destinationFundingSourceUrl,
-        },
+        source: { href: sourceFundingSourceUrl },
+        destination: { href: destinationFundingSourceUrl },
       },
       amount: {
         currency: "USD",
-        value: amount,
+        value: numericAmount.toFixed(2),
       },
     };
-    return await dwollaClient
-      .post("transfers", requestBody)
-      .then((res) => res.headers.get("location"));
-  } catch (err) {
-    console.error("Transfer fund failed: ", err);
+
+    const response = await dwollaClient.post("transfers", requestBody);
+    const transferUrl = response.headers.get("location");
+
+    if (!transferUrl) {
+      throw new Error("Dwolla did not return a transfer confirmation.");
+    }
+
+    return transferUrl;
+  } catch (error) {
+    console.error("Dwolla transfer request failed:", error);
+
+    const dwollaError = error as {
+      message?: string;
+      body?: {
+        message?: string;
+        _embedded?: { errors?: Array<{ message?: string }> };
+      };
+    };
+    const providerMessage =
+      dwollaError.body?._embedded?.errors?.[0]?.message ??
+      dwollaError.body?.message ??
+      dwollaError.message;
+
+    throw new Error(
+      providerMessage
+        ? `Dwolla could not process this transfer: ${providerMessage}`
+        : "Dwolla could not process this transfer. Check the bank funding sources and sandbox account configuration."
+    );
   }
 };
 
